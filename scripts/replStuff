@@ -1,0 +1,117 @@
+def createManyEscPol(orgSlug: String, teamSlug: String, name: String, username: String, howMany: Int ) = {
+      import victorops.services.data.models._
+      val group = db.inHierDb { implicit s => hier =>
+        hier.DAL.EscalationPolicies.getForTeam(orgSlug,teamSlug)}.get.id
+
+      val bareEscPol = escalationPolicyDao.getBarePoliciesForTeam(orgSlug,teamSlug).get
+      val escPolGroup = bareEscPol(1).id
+
+      val base = db.inHierDb { implicit s =>
+        hier => hier.DAL.Users.get(username)}.get
+
+      val firstName = base.firstName
+      val lastName = base.lastName
+      val version = base.version
+
+      for( a <- 1 to howMany) {
+        val escPolName = name + " " + a
+        escalationPolicyDao.createForTeam(orgSlug, teamSlug, escPolName,
+          Seq(EscalationGroup(group, 1, Seq(EscalationEntry(escPolGroup, PolicyType("user"),
+            Some(UserEntry(username, firstName, lastName, version)), None, None, None, None, None)))))
+        println(s"You've just created $escPolName for $teamSlug  in org, $orgSlug")
+      }
+    }
+
+    def createEscPol(orgSlug: String, teamSlug: String, name: String, username: String, howMany: Int ) = {
+      import victorops.services.data.models._
+      val group = db.inHierDb { implicit s => hier =>
+        hier.DAL.EscalationPolicies.getForTeam("the-tower","hall-of-guardians")}.get.id
+
+      val bareEscPol = escalationPolicyDao.getBarePoliciesForTeam(orgSlug,teamSlug).get
+      val escPolGroup = bareEscPol(1).id
+
+      val firstName = db.inHierDb { implicit s =>
+        hier => hier.DAL.Users.get("zavala")}.get.firstName
+
+      val lastName = db.inHierDb { implicit s =>
+        hier => hier.DAL.Users.get("zavala")}.get.firstName
+
+      val version = db.inHierDb { implicit s =>
+        hier => hier.DAL.Users.get("zavala")}.get.version
+
+        escalationPolicyDao.createForTeam(orgSlug, teamSlug, name,
+          Seq(EscalationGroup(group, 1, Seq(EscalationEntry(escPolGroup, PolicyType("user"),
+            Some(UserEntry(username, firstName, lastName, version)), None, None, None, None, None)))))
+        println(s"You've just created " + name + " for " + teamSlug + " in org = " + orgSlug )
+    }
+
+
+
+    def createManyTeams(orgSlug: String, username: String, howMany: Int, include: Boolean = true ) = {
+      import victorops.services.data.models.{Organization, User}
+      for( a <- 1 to howMany) {
+        val maybeUser: Option[User] = userDao.getUser(username)
+        val name = "Escalation Policy" + " " + a
+        if(!maybeUser.isEmpty ) {
+          teamDao.createTeam(orgSlug, name, Some(maybeUser.get.id), include)
+          println(s"You've just created " + a + " Teams in " + orgSlug) 
+        } else {
+          println(s"$username does not exist")
+        }
+      }
+    }
+
+
+    def createUser(orgSlug: String,username: String,email: String, password: String,firstName: String,lastName: String,admin: Boolean ) = {
+      import victorops.services.data.impl.dal.schema.MemberRole
+      val orgId = orgDao.getOrganization(orgSlug).get.id
+      if( admin == true ) {
+        userDao.createUser(orgId,username,email,password, firstName,lastName,true,Set(MemberRole.Admin))
+      } else {
+        userDao.createUser(orgId,username,email,password, firstName,lastName,true,Set(MemberRole.Member))
+      }
+      val userId = userDao.getUser(username).get.id
+      userDao.markVerified(userId, email)
+      println(s"You've just created $username in $orgSlug!")
+    }
+
+
+    def acktheincidents(orgSlug: String, resolve: Boolean = false, message: String, user: String, number: Int) = {
+    for(a <- 1 to number ) {
+      val entityNumber = "storm-" + a
+      Incidents.ackOrResolveByEntity(orgSlug,entityNumber,resolve,message,user)
+    }
+  }
+
+  def hammerChat(orgSlug: String, howManyOuter: Int, howManyInner: Int, sleep: Int = 500 ) = {
+  1.to(howManyOuter).foreach { i => 1.to(howManyInner).foreach{j => Chat.sendChat(orgSlug, "Automated Chat Monster", s"Chattin about stuff  -- ${i} - ${j}")
+  println(s"You've just created chat-$i-$j for org, $orgSlug")}; 
+  Thread.sleep(sleep)
+   }
+  }
+
+
+  def createManyUsers(orgSlug: String,firstName: String,lastName: String,admin: Boolean, howMany: Int ) = {
+     import victorops.services.data.impl.dal.schema.MemberRole
+      import scala.util.{ Failure,id Success, Try }x
+      val orgId = orgDao.getOrganization(orgSlug).get.
+      for(a <- 1 to howMany) {
+        val usernameTemp = "pluralPolicyUser" + a
+        val emailTemp = "kwaldrip+" + a + "@victorops.com"
+        val firstNameTemp = firstName + a
+        val lastNameTemp = lastName + a
+
+        val roles = Set(if (admin == true) MemberRole.Admin else MemberRole.Member)
+        val user = userDao.createUser(orgId, usernameTemp, emailTemp, "changeme", firstNameTemp, lastNameTemp, roles)
+        user match {
+          case Success(u) =>
+            userDao.markVerified(u.id, emailTemp)
+            println(s"You've just created $usernameTemp in $orgSlug!")
+          case Failure(_) =>
+            println(s"Couldn't find ID")
+        }
+      }
+    }
+
+
+   
